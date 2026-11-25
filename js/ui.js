@@ -13,6 +13,7 @@ const UI={
     L.car={x:fx-92*u,y:fy-70*u,r:32*u,id:'car'};
     L.sprint={x:fx+10*u,y:fy-96*u,r:29*u,id:'sprint'};
     L.joy={x:s.l+88*u,y:H-s.b-108*u};
+    { const hudBot=s.t+170*u; if(L.sprint.y-L.sprint.r<hudBot&&L.sprint.x+L.sprint.r>W-s.r-162*u){ L.sprint={x:L.punch.x-L.punch.r-12*u-29*u,y:L.punch.y,r:29*u,id:'sprint'}; } }
     // ---- driving controls (only while in a car) ----
     const land=W>H; const m=14*u;
     const sw=land?92*u:Math.min(86*u,(W*0.5-m-10*u)/2), sh=land?Math.min(92*u,H*0.3):86*u;
@@ -38,7 +39,7 @@ const UI={
   menuMove(p){ if(!p.btn) return; const b=p.btn; const pad=24; if(p.x<b.x-pad||p.x>b.x+b.w+pad||p.y<b.y-pad||p.y>b.y+b.h+pad){ p.btn=null; this.pressedBtn=null; } },
   carHit(x,y){ const L=this.L; for(const k of ['gas','brake','left','right']) if(hitRect(x,y,L[k])) return k; return null; },
   pointerDown(p,id){
-    if(G.mode==='play'&&G.player.car){ const L=this.L;
+    if(G.mode==='play'&&G.player.car&&pedalsMode()){ const L=this.L;
       const circ={czap:'fire',cdrift:'sprint',chorn:'punch',cexit:'car'};
       for(const k in circ){ if(hitCircle(p.x,p.y,L[k])){ const n=circ[k]; p.role='btn:'+n; IN.btn[n]=true; press(n); return; } }
       const k=this.carHit(p.x,p.y); if(k){ p.role='btn:'+k; p.slide=true; IN.btn[k]=true; return; }
@@ -74,7 +75,7 @@ const UI={
       if(IN.pressed.down){ this.sel=(this.sel+1)%Math.max(1,bs.length); }
       if(IN.pressed.up){ this.sel=(this.sel-1+bs.length)%Math.max(1,bs.length); }
       if(IN.pressed.ok&&bs[this.sel]){ AU.sfxPlay('click'); bs[this.sel].fn(); IN.pressed.ok=false; }
-      if(IN.pressed.back||IN.pressed.pause){ IN.pressed.back=IN.pressed.pause=false; if(G.mode==='paused'||G.mode==='shop') resumeGame(); else if(G.mode==='map') G.mode=G.mapReturn||'play'; else if(G.mode==='ending'&&G.endT<=0) G.mode='play'; else if(this.help) this.help=false; else if(G.confirmNew) G.confirmNew=false; }
+      if(IN.pressed.back||IN.pressed.pause){ IN.pressed.back=IN.pressed.pause=false; if(this.settings) this.settings=false; else if(this.help) this.help=false; else if(G.mode==='paused'||G.mode==='shop') resumeGame(); else if(G.mode==='map') G.mode=G.mapReturn||'play'; else if(G.mode==='ending'&&G.endT<=0) G.mode='play'; else if(this.help) this.help=false; else if(G.confirmNew) G.confirmNew=false; }
       if(IN.pressed.map&&G.mode==='map'){ G.mode=G.mapReturn||'play'; IN.pressed.map=false; }
     }
   },
@@ -142,7 +143,7 @@ const UI={
   drawControls(){
     const g=ctx,u=SCR.u,L=this.L,p=G.player; if(IN.lastInput==='key'||IN.lastInput==='pad'){ if(!this.touchSeen) return; }
     if(IN.lastInput==='touch') this.touchSeen=true; if(!this.touchSeen&&IN.lastInput==='mouse') this.touchSeen=true;
-    if(p.car){ this.drawDriveControls(); return; }
+    if(p.car&&pedalsMode()){ this.drawDriveControls(); return; }
     const J=IN.joy; const jx=J.active?J.ox:L.joy.x, jy=J.active?J.oy:L.joy.y; const R=this.joyR();
     g.fillStyle='rgba(255,255,255,0.07)'; g.strokeStyle='rgba(34,230,255,0.45)'; g.lineWidth=2*u; g.beginPath(); g.arc(jx,jy,R,0,TAU); g.fill(); g.stroke();
     const kx=J.active?jx+J.dx*J.mag*R:jx, ky=J.active?jy+J.dy*J.mag*R:jy; g.fillStyle=J.active?'rgba(34,230,255,0.55)':'rgba(255,255,255,0.22)'; g.beginPath(); g.arc(kx,ky,R*0.45,0,TAU); g.fill();
@@ -209,17 +210,21 @@ const UI={
     if(img&&img.complete&&img.naturalWidth){ if(!land){ const sc=Math.max(W/img.naturalWidth,H/img.naturalHeight); const iw=img.naturalWidth*sc, ih=img.naturalHeight*sc; g.drawImage(img,W/2-iw/2,(H-ih)*0.35,iw,ih); }
       else { const ih=H, iw=img.naturalWidth*H/img.naturalHeight; g.drawImage(img,s.l+W*0.02,0,iw,ih); this.pImgW=iw; } }
     if(!land){ const gr=g.createLinearGradient(0,H*0.42,0,H); gr.addColorStop(0,'rgba(10,6,20,0)'); gr.addColorStop(0.35,'rgba(10,6,20,0.7)'); gr.addColorStop(1,'rgba(10,6,20,0.96)'); g.fillStyle=gr; g.fillRect(0,H*0.42,W,H*0.58);
-      logoW=Math.min(W*0.94,520*u); lx=W/2-logoW/2; ly=H*0.47; bw=Math.min(W*0.78,320*u); bx=W/2-bw/2; by=ly+logoW*0.52+14*u; }
+      logoW=Math.min(W*0.94,520*u); lx=W/2-logoW/2; { const nbp=loadSave()?4:3; const need=nbp*50*u+(nbp-1)*12*u+(nbp===4?34:16)*u; ly=Math.max(s.t+8*u,Math.min(H*0.47,H-s.b-need-logoW*0.52-14*u)); } bw=Math.min(W*0.78,320*u); bx=W/2-bw/2; by=ly+logoW*0.52+14*u; }
     else { const left=s.l+W*0.02+(this.pImgW||H*0.56); const gr=g.createLinearGradient(left-80,0,left+60,0); gr.addColorStop(0,'rgba(10,6,20,0)'); gr.addColorStop(1,'rgba(10,6,20,0.95)'); g.fillStyle=gr; g.fillRect(left-80,0,W-left+80,H);
-      const area=W-left-s.r; logoW=Math.min(area*0.92,480*u,(H-s.t-s.b-3*50*u-40*u)/0.52); lx=left+area/2-logoW/2; ly=s.t+H*0.05; bw=Math.min(area*0.7,300*u); bx=left+area/2-bw/2; by=ly+logoW*0.52+10*u; }
+      const area=W-left-s.r; logoW=Math.min(area*0.92,480*u,(H-s.t-s.b-(loadSave()?3:2)*58*u-36*u)/0.52); lx=left+area/2-logoW/2; ly=s.t+H*0.05; bw=Math.min(area*0.7,300*u); bx=left+area/2-bw/2; by=ly+logoW*0.52+10*u; }
     if(!this.logo||this.logoW!==logoW){ this.logo=this.makeLogo(logoW); this.logoW=logoW; }
     g.drawImage(this.logo,lx,ly,logoW,logoW*0.52);
-    const save=loadSave(); const nb=save?3:2; const bh=clamp((H-s.b-by-(save?34:16)*u)/(nb+(nb-1)*0.24),44,54*u); const gap=bh*0.24;
+    const save=loadSave(); const nb=land?(save?3:2):(save?4:3); const bh=clamp((H-s.b-by-(save?34:16)*u)/(nb+(nb-1)*0.24),44,54*u); const gap=bh*0.24;
     if(this.help){ this.drawHelp(); return; }
+    if(this.settings){ this.drawSettings(); return; }
     if(G.confirmNew&&save){ this.drawConfirm(); return; }
     let yy=by; if(save){ this.btn(bx,yy,bw,bh,'CONTINUE',()=>startGame(false),{primary:true}); yy+=bh+gap; this.btn(bx,yy,bw,bh,'NEW GAME',()=>{ G.confirmNew=true; this.sel=1; }); }
     else { this.btn(bx,yy,bw,bh,'PLAY',()=>startGame(true),{primary:true}); }
-    yy+=bh+gap; this.btn(bx,yy,bw,bh,'HOW TO PLAY',()=>{this.help=true; this.helpScroll=0; this.sel=0;});
+    const openHelp=()=>{this.help=true; this.helpScroll=0; this.sel=0;}, openSet=()=>{this.settings=true; this.sel=0;};
+    yy+=bh+gap;
+    if(land){ const hw=(bw-gap)/2; this.btn(bx,yy,hw,bh,'HOW TO PLAY',openHelp,{fs:Math.min(15*u,hw*0.1)}); this.btn(bx+hw+gap,yy,hw,bh,'SETTINGS',openSet,{fs:Math.min(15*u,hw*0.1)}); }
+    else { this.btn(bx,yy,bw,bh,'HOW TO PLAY',openHelp); yy+=bh+gap; this.btn(bx,yy,bw,bh,'SETTINGS',openSet); }
     if(save){ this.text(fmtCash(save.cash)+'  ·  missions '+Math.min(save.mission,MISSIONS.length)+'/'+MISSIONS.length,bx+bw/2,yy+bh+16*u,12*u,'#cfe','center'); }
     this.text('v'+VERSION,W-s.r-8*u,H-s.b-10*u,10*u,'rgba(255,255,255,0.4)','right',false);
   },
@@ -229,13 +234,15 @@ const UI={
     const bw=(pw-48*u)/2; this.btn(px+16*u,py+ph-66*u,bw,50*u,'CANCEL',()=>{G.confirmNew=false;}); this.btn(px+32*u+bw,py+ph-66*u,bw,50*u,'YES, NEW',()=>startGame(true),{primary:true}); },
   drawHelp(){ const g=ctx,u=SCR.u,W=SCR.W,H=SCR.H,s=SCR.safe; this.buttons=[]; g.fillStyle='rgba(6,3,16,0.97)'; g.fillRect(0,0,W,H);
     const sections=[['ON FOOT','#ff2bd6',['Drag anywhere on the LEFT side to walk.','ZAP: paint blaster (auto-aims).  PUNCH: knock people over.  RUN: sprint.','CAR: walk up to any car and tap CAR to hop in.','Tap the little map (top-left) for the big city map. II pauses the game.']],
-      ['DRIVING','#9dff3a',['Hold the big LEFT and RIGHT arrows (bottom-left) to steer. Turning gets stronger the longer you hold.','Hold GAS (tall pedal, bottom-right) to go. Hold BRAKE to slow down. Keep holding BRAKE when stopped to back up.','Use two thumbs: hold GAS and steer at the same time. Slide your thumb between the arrows to switch sides.','DRIFT: handbrake slide for sharp turns.  HORN: beep.  EXIT: hop out.  ZAP works in cars too.']],
+      pedalsMode()?['DRIVING (ARROWS + PEDALS)','#9dff3a',['Hold the big LEFT and RIGHT arrows (bottom-left) to steer. Turning gets stronger the longer you hold.','Hold GAS (tall pedal, bottom-right) to go. Hold BRAKE to slow down. Keep holding BRAKE when stopped to back up.','Use two thumbs: hold GAS and steer at the same time. Slide your thumb between the arrows to switch sides.','DRIFT: handbrake slide for sharp turns.  HORN: beep.  EXIT: hop out.  ZAP works in cars too.','Prefer a joystick? Switch in SETTINGS.']]
+        :['DRIVING (JOYSTICK)','#9dff3a',['Drag on the LEFT side and point where you want to go: the car drives toward your thumb. Push further for more speed.','Pull the stick the opposite way to brake, then back up.','DRIFT: handbrake slide for sharp turns.  HORN: beep.  EXIT: hop out.  ZAP works in cars too.','Prefer arrows and pedals? Switch in SETTINGS.']],
       ['GOAL','#ffd23a',['Walk or drive into the glowing yellow ! markers to start missions. 7 missions turn Shane into the legend of Neon Bay.','Find 12 hidden neon TAGS for cash, and spend it at the DRIP shop ($ on the map).']],
       ['COPS','#22e6ff',['Causing trouble earns stars. Get out of sight until they fade, or drive through a SPRAY KINGZ respray (S on the map).','Walk into the HIDEOUT (H) to save and heal.']],
       ['KEYBOARD','#9dff3a',['WASD or arrows move (car: W gas, S brake, A/D steer). E car, Space zap, Q punch, Shift run/drift, M map, R radio, P pause.']],
       ['CONTROLLER','#9dff3a',['Left stick move/steer, X or RT zap, A punch, Y car, B or LT run/drift, Start pause.']]];
+    this.helpDriving=sections.find(x=>x[0].startsWith('DRIVING'))[0];
     // header with BACK, footer with GOT IT, scrollable content between
-    const hh=60*u, top=s.t, fh=72*u, bot=H-s.b;
+    const hh=Math.max(60*u,62), top=s.t, fh=Math.max(72*u,64), bot=H-s.b;
     const cTop=top+hh, cBot=bot-fh, maxW=Math.min(W-s.l-s.r-40*u,600*u), fs=clamp(15*u,14,19), lh=fs*1.42, cx=W/2;
     const items=[]; for(const [t,c,ps] of sections){ items.push({t,c,h:fs*2.1,head:true}); for(const pgh of ps){ for(const l of this.wrap(pgh,maxW-14*u,fs)) items.push({t:l,h:lh}); items.push({t:'',h:lh*0.45}); } }
     const total=items.reduce((a,b)=>a+b.h,0)+10*u; const view=cBot-cTop; const maxScroll=Math.max(0,total-view); this.helpScroll=clamp(this.helpScroll,0,maxScroll);
@@ -251,13 +258,42 @@ const UI={
     // footer
     g.fillStyle='#120a26'; g.fillRect(0,bot-fh,W,H-(bot-fh)); g.fillStyle='#22e6ff'; g.fillRect(0,bot-fh,W,2*u);
     const bw=Math.min(260*u,W*0.7); this.btn(W/2-bw/2,bot-fh+12*u,bw,fh-24*u,'GOT IT',()=>{this.help=false;},{primary:true}); },
+  drawSettings(){ const g=ctx,u=SCR.u,W=SCR.W,H=SCR.H,s=SCR.safe; this.buttons=[]; g.fillStyle='rgba(6,3,16,0.97)'; g.fillRect(0,0,W,H);
+    const land=W>H*1.1, hh=Math.max(60*u,62), top=s.t;
+    g.fillStyle='#120a26'; g.fillRect(0,0,W,top+hh); g.fillStyle='#ff2bd6'; g.fillRect(0,top+hh-2*u,W,2*u);
+    this.text('SETTINGS',W/2+30*u,top+hh/2,Math.min(22*u,W*0.055),'#ffd23a','center');
+    this.btn(s.l+10*u,top+8*u,104*u,hh-16*u,'< BACK',()=>{this.settings=false;},{fs:15*u});
+    const aw=Math.min(W-s.l-s.r-28*u,640*u), ax=W/2-aw/2; let y=top+hh+(land?12:22)*u;
+    this.text('CAR CONTROLS',ax,y+8*u,15*u,'#9dff3a','left'); y+=(land?22:28)*u;
+    const gap=12*u, cw=(aw-gap)/2, ch=land?clamp(H-s.b-y-82*u,96,150*u):Math.min(190*u,H*0.3);
+    const card=(x,mode,title,sub)=>{ const on=SETTINGS.carCtl===mode; const b=this.btn(x,y,cw,ch,'',()=>{ setCarCtl(mode); },{fill:on?'rgba(157,255,58,0.16)':'rgba(20,14,38,0.9)',stroke:on?'#9dff3a':'rgba(34,230,255,0.6)'});
+      b.label=''; b.key='card-'+mode; const down=this.pressedBtn===b.key;
+      if(on){ g.strokeStyle='#9dff3a'; g.lineWidth=4*u; roundRect(g,x,y,cw,ch,12*u); g.stroke(); g.fillStyle='#9dff3a'; roundRect(g,x+cw-34*u,y+8*u,26*u,26*u,13*u); g.fill(); g.strokeStyle='#0a0614'; g.lineWidth=3.5*u; g.beginPath(); g.moveTo(x+cw-27*u,y+21*u); g.lineTo(x+cw-22*u,y+26*u); g.lineTo(x+cw-14*u,y+15*u); g.stroke(); }
+      if(down){ g.fillStyle='rgba(255,255,255,0.12)'; roundRect(g,x,y,cw,ch,12*u); g.fill(); }
+      // icon
+      const ix=x+cw/2, iy=y+ch*0.36, k=Math.min(ch*0.0055,cw*0.0062)*u/u; g.save(); g.translate(ix,iy); g.scale(k*1.0,k*1.0);
+      if(mode==='joystick'){ g.fillStyle='rgba(255,255,255,0.08)'; g.strokeStyle='#22e6ff'; g.lineWidth=3; g.beginPath(); g.arc(0,0,30,0,TAU); g.fill(); g.stroke(); g.fillStyle='rgba(34,230,255,0.7)'; g.beginPath(); g.arc(10,-10,13,0,TAU); g.fill(); }
+      else { g.fillStyle='#22e6ff'; for(const d of [-1,1]){ g.beginPath(); g.moveTo(-40+d*12-d*8,-12); g.lineTo(-40+d*12+d*8,0); g.lineTo(-40+d*12-d*8,12); g.closePath(); g.fill(); }
+        g.fillStyle='rgba(255,77,109,0.85)'; roundRect(g,8,-6,18,26,4); g.fill(); g.fillStyle='rgba(157,255,58,0.9)'; roundRect(g,30,-22,18,42,4); g.fill(); }
+      g.restore();
+      this.text(title,ix,y+ch*0.7,Math.min(15*u,cw*0.085),on?'#9dff3a':'#fff','center');
+      this.text(sub,ix,y+ch*0.7+18*u,Math.min(11*u,cw*0.062),'rgba(255,255,255,0.7)','center',false);
+      if(on) this.text('SELECTED',ix,y+ch-12*u,10*u,'#9dff3a','center',false); };
+    card(ax,'pedals','ARROWS + PEDALS','steer arrows, GAS & BRAKE'); card(ax+cw+gap,'joystick','JOYSTICK','car drives toward thumb');
+    y+=ch+(land?12:24)*u;
+    this.text('SOUND & RADIO',ax,y+8*u,15*u,'#22e6ff','left'); y+=(land?20:28)*u;
+    const bh=Math.max(44,Math.min(50*u,H-s.b-y-10*u));
+    this.btn(ax,y,cw,bh,'SOUND: '+(AU.muted?'OFF':'ON'),toggleSound,{fs:Math.min(15*u,cw*0.08)});
+    this.btn(ax+cw+gap,y,cw,bh,'RADIO: '+STATIONS[G.save.radio].name,cycleRadio,{fs:Math.min(13*u,cw*0.07)});
+  },
   drawPause(){ const g=ctx,u=SCR.u,W=SCR.W,H=SCR.H,s=SCR.safe; this.buttons=[]; g.fillStyle='rgba(6,3,16,0.86)'; g.fillRect(0,0,W,H);
     if(this.help){ this.drawHelp(); return; }
+    if(this.settings){ this.drawSettings(); return; }
     const land=W>H; const bw=Math.min(280*u,W*0.7); const bh=Math.min(46*u,(H-s.t-s.b-120*u)/7.2); let y=s.t+Math.max(20*u,(H-s.t-s.b-bh*8.3)/2);
     this.text('PAUSED',W/2,y+12*u,30*u,'#ff2bd6','center'); y+=34*u;
     const sv=G.save; this.text(`${fmtCash(sv.cash)} · missions ${Math.min(sv.mission,MISSIONS.length)}/${MISSIONS.length} · tags ${sv.tags.length}/${WORLD.tagSpots.length}`,W/2,y,12*u,'#cfe','center',false); y+=18*u;
     const bx=W/2-bw/2, gp=bh*0.2;
-    const items=[['RESUME',resumeGame,true],['CITY MAP',()=>{G.mapReturn='paused';G.mode='map';}],['RADIO: '+STATIONS[sv.radio].name,cycleRadio],['SOUND: '+(AU.muted?'OFF':'ON'),toggleSound],['HOW TO PLAY',()=>{this.help=true;this.helpScroll=0;}],['SAVE & QUIT',()=>{ if(!G.mission) writeSave(); G.mode='title'; AU.wantMusic(true,0); AU.setEngine(false,0); AU.setSiren(0); AU.setSkid(0); }]];
+    const items=[['RESUME',resumeGame,true],['CITY MAP',()=>{G.mapReturn='paused';G.mode='map';}],['SETTINGS',()=>{this.settings=true;this.sel=0;}],['HOW TO PLAY',()=>{this.help=true;this.helpScroll=0;}],['SAVE & QUIT',()=>{ if(!G.mission) writeSave(); G.mode='title'; AU.wantMusic(true,0); AU.setEngine(false,0); AU.setSiren(0); AU.setSkid(0); }]];
     for(const [l,f,pr] of items){ this.btn(bx,y,bw,bh,l,f,{primary:pr,fs:Math.min(16*u,bh*0.38)}); y+=bh+gp; }
     if(G.mission) this.text('(quitting abandons the current mission)',W/2,y+6*u,10*u,'rgba(255,255,255,0.5)','center',false); },
   drawShop(){ const g=ctx,u=SCR.u,W=SCR.W,H=SCR.H,s=SCR.safe; this.buttons=[]; g.fillStyle='rgba(8,4,20,0.95)'; g.fillRect(0,0,W,H);
@@ -288,5 +324,5 @@ const UI={
 function drawStar(g,x,y,r,c,pulse){ g.save(); g.translate(x,y); if(pulse) g.scale(1.3,1.3); g.beginPath(); for(let k=0;k<10;k++){ const a=-Math.PI/2+k*Math.PI/5, rr2=k%2?r*0.45:r; g.lineTo(Math.cos(a)*rr2,Math.sin(a)*rr2); } g.closePath(); g.fillStyle=c; g.fill(); g.strokeStyle='rgba(0,0,0,0.8)'; g.lineWidth=1.5; g.stroke(); g.restore(); }
 function pauseGame(){ if(G.mode!=='play')return; G.mode='paused'; UI.sel=0; UI.help=false; AU.setEngine(false,0); AU.setSkid(0); AU.setSiren(0); AU.sfxPlay('click'); }
 function resumeGame(){ G.mode='play'; UI.help=false; G.shopCD=true; }
-function toggleSound(){ AU.setMuted(!AU.muted); G.save.muted=AU.muted; writeSave(); }
-function cycleRadio(){ G.save.radio=(G.save.radio+1)%STATIONS.length; AU.wantMusic(!!G.player.car,G.save.radio); toast('♪ '+STATIONS[G.save.radio].name,'#ff2bd6',1.4); writeSave(); }
+function toggleSound(){ AU.setMuted(!AU.muted); G.save.muted=AU.muted; SETTINGS.muted=AU.muted; saveSettings(); if(G.mode!=='title') writeSave(); }
+function cycleRadio(){ G.save.radio=(G.save.radio+1)%STATIONS.length; AU.wantMusic(!!G.player.car,G.save.radio); toast('♪ '+STATIONS[G.save.radio].name,'#ff2bd6',1.4); SETTINGS.radio=G.save.radio; saveSettings(); if(G.mode!=='title') writeSave(); }

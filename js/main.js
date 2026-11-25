@@ -4,6 +4,7 @@ function startGame(fresh){
   G.confirmNew=false;
   if(fresh){ const keep=G.save; G.save=defaultSave(); G.save.muted=AU.muted; G.save.radio=keep&&keep.radio!=null?keep.radio:0; writeSave(); }
   else { const s=loadSave(); if(s) G.save=s; }
+  if(SETTINGS.muted!=null) G.save.muted=SETTINGS.muted; if(SETTINGS.radio!=null) G.save.radio=SETTINGS.radio;
   AU.setMuted(!!G.save.muted);
   resetWorldState();
   G.mode='play'; UI.help=false;
@@ -211,14 +212,14 @@ function frame(ts){
 }
 function boot(){
   genWorld(); makeFoliage(); makeHead(); resize();
-  const s=loadSave(); if(s){ G.save=s; AU.muted=!!s.muted; }
+  const s=loadSave(); if(s){ G.save=s; AU.muted=!!s.muted; } if(SETTINGS.muted!=null) AU.muted=!!SETTINGS.muted;
   UI.portrait=new Image(); UI.portrait.src='img/portrait.jpg';
   const q=new URLSearchParams(location.search); if(q.has('reset')){ localStorage.removeItem(SAVE_KEY); history.replaceState(null,'',location.pathname); }
   G.player=makePlayer(W.places.hideout.x,W.places.hideout.y); computeView();
   requestAnimationFrame(frame);
 }
 // test hooks
-window.__game={G,W,UI,IN,AU,MISSIONS,startGame,startMission,setHeat,stars,busted,exitCar,tryEnterCar,makeCar,update,nodePos,writeSave,loadSave,
+window.__game={G,W,UI,IN,AU,SETTINGS,setCarCtl,MISSIONS,startGame,startMission,setHeat,stars,busted,exitCar,tryEnterCar,makeCar,update,nodePos,writeSave,loadSave,
   warp(x,y){ const p=G.player; if(p.car){p.car.x=x;p.car.y=y;p.car.vx=p.car.vy=0;} p.x=x;p.y=y; G.cam.x=x;G.cam.y=y; computeView(); },
   state(){ const p=G.player; return {mode:G.mode,x:p.x,y:p.y,inCar:!!p.car,car:p.car&&p.car.type,spd:p.car?p.car.spd:Math.hypot(p.vx,p.vy),hp:p.hp,heat:G.heat,stars:stars(),cash:G.save.cash,mission:G.mission&&G.mission.def.id,obj:G.mission&&G.mission.obj,saveMission:G.save.mission,cars:G.cars.length,peds:G.peds.length,cops:G.cars.filter(c=>c.driver==='cop').length,fps:G.fps}; } };
 boot();

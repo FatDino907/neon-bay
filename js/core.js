@@ -1,6 +1,6 @@
 'use strict';
 // ===== NEON BAY: STREET LEGEND — core =====
-const VERSION='1.1';
+const VERSION='1.2';
 const HERO_NAME='SHANE';
 const T=48, MW=100, MH=100;
 const TL={ROAD:0,SIDE:1,BLD:2,GRASS:3,BOARD:4,SAND:5,WATER:6,ALLEY:7,LOT:8,PLAZA:9,HWY:10};
@@ -120,6 +120,14 @@ function held(name){
 // ----- save -----
 function defaultSave(){return {v:1,cash:250,mission:0,done:[],hoodie:'forest',hoodies:['forest'],paint:'auto',paints:['auto'],tags:[],stats:{busted:0,wiped:0,cars:0,drift:0},radio:0,muted:false,intro:false};}
 function loadSave(){try{const s=JSON.parse(localStorage.getItem(SAVE_KEY)||'null'); if(s&&s.v===1){return Object.assign(defaultSave(),s);} }catch(e){} return null;}
+// ----- settings (separate from the game save so changing them never creates a save) -----
+const SETTINGS_KEY='neonbay-settings-v1';
+const SETTINGS=(()=>{ let s={}; try{ s=JSON.parse(localStorage.getItem(SETTINGS_KEY)||'{}')||{}; }catch(e){} if(s.carCtl!=='joystick') s.carCtl='pedals'; return s; })();
+function saveSettings(){ try{ localStorage.setItem(SETTINGS_KEY,JSON.stringify(SETTINGS)); }catch(e){} }
+function setCarCtl(m){ SETTINGS.carCtl=(m==='joystick')?'joystick':'pedals'; saveSettings();
+  for(const k of ['gas','brake','left','right','fire','punch','car','sprint']) IN.btn[k]=false; IN.steerV=0; IN.joy.active=false; IN.joy.mag=0;
+  for(const [id,p] of IN.pointers){ p.role='none'; } }
+function pedalsMode(){ return SETTINGS.carCtl!=='joystick'; }
 function writeSave(){ try{ localStorage.setItem(SAVE_KEY,JSON.stringify(G.save)); G.savedAt=G.time; }catch(e){} }
 
 // ----- global game state -----
