@@ -257,7 +257,7 @@ function tryEnterCar(){
   toPhys(c); c.driver='player'; c.persist=true; c.ctrl=null; c.siren=false; c.mode='phys';
   if(c.type==='cop'&&!jacked) crime(0.6,c.x,c.y,true); else if(jacked) crime(0.4,c.x,c.y,true);
   if(p.lastCar&&p.lastCar!==c) p.lastCar.persist=false; p.car=c; p.lastCar=c; G.save.stats.cars++;
-  AU.sfxPlay('door'); toast(c.P.name,'#22e6ff',1.6); alarm(c.x,c.y,140);
+  AU.sfxPlay('door'); toast(c.P.name,'#22e6ff',1.6); if(IN.lastInput==='touch'&&!G.driveTip){ G.driveTip=true; toast('Hold GAS to go · hold the arrows to steer','#9dff3a',3.5); } alarm(c.x,c.y,140); IN.joy.active=false; IN.joy.mag=0;
 }
 function exitCar(force){
   const p=G.player, c=p.car; if(!c) return; const fx=Math.cos(c.a), fy=Math.sin(c.a);
@@ -270,7 +270,13 @@ function exitCar(force){
 }
 function playerCar(dt){
   const p=G.player, c=p.car; const mv=moveVec(); let thr=0,steer=0; const hb=held('sprint');
-  if(mv.src==='key'){ // tank controls on keyboard
+  // touch steering: hold LEFT/RIGHT, turn strength eases in from 35% to 100% over ~0.35s
+  const st=(IN.btn.right?1:0)-(IN.btn.left?1:0);
+  if(st){ if(Math.sign(IN.steerV)!==st) IN.steerV=0.35*st; IN.steerV=clamp(IN.steerV+st*1.8*dt,-1,1); } else IN.steerV=0;
+  const touchDrive=IN.btn.gas||IN.btn.brake||st!==0;
+  if(touchDrive){ thr=IN.btn.brake?-1:(IN.btn.gas?1:0); steer=IN.steerV; c.revMode=false; }
+  else if(mv.src==='touch'){ c.revMode=false; }
+  else if(mv.src==='key'){ // tank controls on keyboard
     if(IN.keys.KeyW||IN.keys.ArrowUp)thr=1; if(IN.keys.KeyS||IN.keys.ArrowDown)thr=-1; if(IN.keys.KeyA||IN.keys.ArrowLeft)steer=-1; if(IN.keys.KeyD||IN.keys.ArrowRight)steer=1;
     if((c.vf||0)<-5) steer=steer; }
   else if(mv.mag>0){ // stick: car drives toward the stick direction

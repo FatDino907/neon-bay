@@ -1,6 +1,6 @@
 'use strict';
 // ===== NEON BAY: STREET LEGEND — core =====
-const VERSION='1.0';
+const VERSION='1.1';
 const HERO_NAME='SHANE';
 const T=48, MW=100, MH=100;
 const TL={ROAD:0,SIDE:1,BLD:2,GRASS:3,BOARD:4,SAND:5,WATER:6,ALLEY:7,LOT:8,PLAZA:9,HWY:10};
@@ -21,19 +21,24 @@ const SCR={W:390,H:844,dpr:1,u:1,safe:{t:0,r:0,b:0,l:0}};
 function resize(){
   const dpr=Math.min(window.devicePixelRatio||1, 2);
   SCR.W=window.innerWidth; SCR.H=window.innerHeight; SCR.dpr=dpr;
+  // Size the canvas element to EXACTLY the visible viewport in CSS px. (iOS Safari's 100vh is taller than the
+  // visible area while the toolbar shows, which stretched the drawing and shifted every button's hit area.)
+  cv.style.width=SCR.W+'px'; cv.style.height=SCR.H+'px';
   cv.width=Math.round(SCR.W*dpr); cv.height=Math.round(SCR.H*dpr);
   SCR.u=clamp(Math.min(SCR.W,SCR.H)/390,0.82,1.5);
   const s=getComputedStyle(document.getElementById('safe'));
   SCR.safe={t:parseFloat(s.paddingTop)||0,r:parseFloat(s.paddingRight)||0,b:parseFloat(s.paddingBottom)||0,l:parseFloat(s.paddingLeft)||0};
   if(typeof UI!=='undefined') UI.layout();
 }
-window.addEventListener('resize',resize); window.addEventListener('orientationchange',()=>setTimeout(resize,200));
+window.addEventListener('resize',resize); window.addEventListener('orientationchange',()=>{setTimeout(resize,100);setTimeout(resize,400);});
+if(window.visualViewport) window.visualViewport.addEventListener('resize',resize);
+function checkSize(){ if(window.innerWidth!==SCR.W||window.innerHeight!==SCR.H) resize(); }
 
 // ----- input -----
 const IN={
   pointers:new Map(), // id -> {x,y,role}
   joy:{active:false,id:null,ox:0,oy:0,x:0,y:0,dx:0,dy:0,mag:0},
-  btn:{fire:false,punch:false,car:false,sprint:false},
+  btn:{fire:false,punch:false,car:false,sprint:false,gas:false,brake:false,left:false,right:false}, steerV:0,
   pressed:{}, // edge-triggered this frame
   keys:{}, gp:{x:0,y:0,mag:0,btn:{}},
   taps:[], lastInput:'touch'
@@ -44,27 +49,36 @@ function hitRect(x,y,r){return r&&x>=r.x&&x<=r.x+r.w&&y>=r.y&&y<=r.y+r.h;}
 cv.addEventListener('pointerdown',e=>{
   e.preventDefault(); try{cv.setPointerCapture(e.pointerId);}catch(_){}
   IN.lastInput=e.pointerType==='mouse'?'mouse':'touch';
-  if(typeof AU!=='undefined') AU.unlock();
+  try{ if(typeof AU!=='undefined') AU.unlock(); }catch(_){}
   const x=e.clientX,y=e.clientY; const p={x,y,role:'tap',sx:x,sy:y,t:performance.now()};
   IN.pointers.set(e.pointerId,p);
   if(typeof UI!=='undefined') UI.pointerDown(p,e.pointerId);
 },{passive:false});
 cv.addEventListener('pointermove',e=>{
   const p=IN.pointers.get(e.pointerId); if(!p)return; e.preventDefault();
-  p.x=e.clientX;p.y=e.clientY;
+  const py=p.y; p.x=e.clientX;p.y=e.clientY;
+  if(p.role==='menu'&&typeof UI!=='undefined') UI.menuMove(p);
+  if(p.role==='scroll'&&typeof UI!=='undefined'){ UI.helpScroll-=(p.y-py); }
+  if(p.slide&&p.role&&typeof UI!=='undefined'){ const cur=p.role.slice(4); const k=UI.carHit(p.x,p.y); const pair={left:'right',right:'left',gas:'brake',brake:'gas'};
+    if(k&&k===pair[cur]){ IN.btn[cur]=false; IN.btn[k]=true; p.role='btn:'+k; } }
   if(p.role==='joy'){ const J=IN.joy; let dx=p.x-J.ox, dy=p.y-J.oy; const R=UI.joyR(); const m=Math.hypot(dx,dy);
     if(m>R){ // drag the base along (floating stick)
       J.ox=p.x-dx/m*R; J.oy=p.y-dy/m*R; dx=p.x-J.ox; dy=p.y-J.oy; }
     J.x=p.x;J.y=p.y; const mm=Math.min(1,Math.hypot(dx,dy)/R); J.mag=mm<0.12?0:mm; J.dx=dx/(Math.hypot(dx,dy)||1); J.dy=dy/(Math.hypot(dx,dy)||1); }
 },{passive:false});
 function endPointer(e){
-  const p=IN.pointers.get(e.pointerId); if(!p)return; IN.pointers.delete(e.pointerId);
+  const p=IN.pointers.get(e.pointerId); if(!p)return; IN.pointers.delete(e.pointerId); const cancel=e.type==='pointercancel';
+  if(e.type==='pointerup'){ try{ if(typeof AU!=='undefined') AU.unlock(); }catch(_){} }
+  if(p.role==='menu'){ if(!cancel&&p.btn) IN.taps.push({btn:p.btn}); if(typeof UI!=='undefined') UI.pressedBtn=null; return; }
+  if(p.role==='scroll') return;
+  if(cancel&&p.role==='tap') return;
   if(p.role==='joy'){IN.joy.active=false;IN.joy.id=null;IN.joy.mag=0;}
   else if(p.role&&p.role.startsWith('btn:')){ IN.btn[p.role.slice(4)]=false; }
   else if(p.role==='tap'){ IN.taps.push({x:p.x,y:p.y,sx:p.sx,sy:p.sy}); }
 }
 cv.addEventListener('pointerup',endPointer); cv.addEventListener('pointercancel',endPointer);
 cv.addEventListener('contextmenu',e=>e.preventDefault());
+cv.addEventListener('wheel',e=>{ if(typeof UI!=='undefined'&&UI.help){ UI.helpScroll+=e.deltaY; e.preventDefault(); } },{passive:false});
 const KEYMAP={KeyE:'car',Enter:'car',KeyF:'car',Space:'fire',KeyJ:'fire',KeyK:'punch',KeyQ:'punch',ShiftLeft:'sprint',ShiftRight:'sprint',KeyH:'horn',Escape:'pause',KeyP:'pause',KeyM:'map',KeyR:'radio',KeyX:'punch'};
 window.addEventListener('keydown',e=>{
   if(typeof AU!=='undefined') AU.unlock();

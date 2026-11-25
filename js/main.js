@@ -195,8 +195,8 @@ let last=performance.now(); G.fps=60;
 function frame(ts){
   let dt=Math.min(0.05,(ts-last)/1000); last=ts; if(dt<=0)dt=0.001; G.fps=G.fps*0.95+(1/dt)*0.05;
   try{
-    pollGamepad(); UI.processTaps();
-    if(G.mode==='title'){ G.time+=dt; for(const t of G.toast)t.t-=dt; G.toast=G.toast.filter(t=>t.t>0); if(IN.pressed.back&&UI.help)UI.help=false; }
+    checkSize(); pollGamepad(); UI.processTaps();
+    if(G.mode==='title'){ G.time+=dt; for(const t of G.toast)t.t-=dt; G.toast=G.toast.filter(t=>t.t>0);  }
     else if(G.mode==='play'){ const steps=dt>0.034?2:1; for(let i=0;i<steps;i++){ update(dt/steps); if(i===0){ /* edge inputs only once */ const keep=IN.pressed; IN.pressed={}; if(steps>1) IN.pressedPrev=keep; } } }
     else if(G.mode==='busted'||G.mode==='wiped'){ G.time+=dt; G.overT-=dt; partsUpdate(dt); if(G.overT<=0) respawnHideout(); }
     else if(G.mode==='ending'){ G.time+=dt; G.endT-=dt; }
